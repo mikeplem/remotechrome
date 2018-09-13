@@ -1,54 +1,31 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
+	"strings"
+	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/BurntSushi/toml"
 	"github.com/raff/godet"
 )
 
-func main() {
-
-	// currentURL := flag.Bool("current", false, "print current URL open")
-	// openURL := flag.String("open", "", "URL to open in browser")
-
-	// flag.Parse()
-
-	// user requested the current open URL
-	// if *currentURL {
-	// 	tabs, _ := remoteConn.TabList("")
-	// 	for _, value := range tabs {
-	// 		if value.Type != "background_page" {
-	// 			fmt.Printf("%s,%s\n", value.Title, value.URL)
-	// 		}
-	// 	}
-	// }
-
-	// user wants to open a new URL
-	// if *openURL != "" {
-	// 	_, _ = remoteConn.Navigate(*openURL)
-	// }
-
-	router := mux.NewRouter()
-	router.HandleFunc("/", printCurrentURL).Methods("GET")
-	router.HandleFunc("/current", printCurrentURL).Methods("GET")
-	router.HandleFunc("/open", openURLInBrowser).Methods("POST")
-
-	log.Fatal(http.ListenAndServe(":8080", router))
-}
-
 func printCurrentURL(w http.ResponseWriter, r *http.Request) {
 
-	remote, err := godet.Connect("localhost:9222", false)
+	connString := fmt.Sprintf("%s:%d", Config.Chrome.Host, Config.Chrome.Port)
+
+	remote, err := godet.Connect(connString, false)
 	if err != nil {
 		fmt.Fprintln(w, "cannot connect to Chrome instance:", err)
 		return
 	}
 
-	// disconnect when done
 	defer remote.Close()
+
 	tabs, _ := remote.TabList("")
 	for _, value := range tabs {
 		if value.Type != "background_page" {
@@ -59,17 +36,109 @@ func printCurrentURL(w http.ResponseWriter, r *http.Request) {
 
 func openURLInBrowser(w http.ResponseWriter, r *http.Request) {
 
-	remote, err := godet.Connect("localhost:9222", false)
-	if err != nil {
-		fmt.Fprintln(w, "cannot connect to Chrome instance:", err)
-		return
+	var results []string
+	var openURL string
+
+	connString := fmt.Sprintf("%s:%d", Config.Chrome.Host, Config.Chrome.Port)
+
+	// 	helpful code https://gist.github.com/alyssaq/75d6678d00572d103106
+
+	if r.Method == "POST" {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Error reading request body",
+				http.StatusInternalServerError)
+		}
+
+		results = append(results, string(body))
+		openURL = strings.Join(results, " ")
+
+		u, err := url.Parse(openURL)
+		if err != nil {
+			log.Fatal(err)
+		}
+		unescapeURL, err := url.PathUnescape(u.String())
+		if err != nil {
+			log.Println(err)
+		}
+
+		stripURL := strings.TrimPrefix(unescapeURL, "u=")
+
+		remote, err := godet.Connect(connString, false)
+		if err != nil {
+			fmt.Fprintln(w, "cannot connect to Chrome instance:", err)
+			return
+		}
+
+		defer remote.Close()
+
+		fmt.Printf("Requested to open %s\n", stripURL)
+		_, _ = remote.Navigate(stripURL)
+		fmt.Fprint(w, "POST done")
+
+	} else {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 	}
 
-	// disconnect when done
-	defer remote.Close()
+}
 
-	vars := mux.Vars(r)
-	openURL := vars["url"]
-	fmt.Println(openURL)
-	_, _ = remote.Navigate(openURL)
+// ConfigFile holds the user supplied configuration file - it is placed here since it is a global
+var ConfigFile *string
+
+// Config is the structure of the TOML config structure
+var Config tomlConfig
+
+type tomlConfig struct {
+	Listen listenconfig `toml:"listen"`
+	Chrome chromeconfig `toml:"chrome"`
+}
+
+type listenconfig struct {
+	SSL  bool
+	Cert string
+	Key  string
+	Port int
+}
+
+type chromeconfig struct {
+	Host string
+	Port int
+}
+
+func init() {
+
+	ConfigFile = flag.String("conf", "", "Config file for this listener and chrome port info")
+
+	flag.Parse()
+
+	if _, err := toml.DecodeFile(*ConfigFile, &Config); err != nil {
+		log.Fatal(err)
+	}
+
+}
+
+func main() {
+
+	listenPort := fmt.Sprintf(":%d", Config.Listen.Port)
+
+	http.HandleFunc("/", printCurrentURL)
+	http.HandleFunc("/current", printCurrentURL)
+	http.HandleFunc("/open", openURLInBrowser)
+
+	if Config.Listen.SSL == true {
+		fmt.Println("Listening on port " + listenPort + " with SSL")
+		err := http.ListenAndServeTLS(listenPort, Config.Listen.Cert, Config.Listen.Key, nil)
+		if err != nil {
+			fmt.Print(time.Now())
+			log.Fatal("ListenAndServe: ", err)
+		}
+	} else {
+		fmt.Println("Listening on port " + listenPort + " without SSL")
+		err := http.ListenAndServe(listenPort, nil)
+		if err != nil {
+			fmt.Print(time.Now())
+			log.Fatal("ListenAndServe: ", err)
+		}
+	}
+
 }
