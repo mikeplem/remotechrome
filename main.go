@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -76,11 +77,23 @@ func openURLInBrowser(w http.ResponseWriter, r *http.Request) {
 		_, _ = remote.Navigate(stripURL)
 		fmt.Fprint(w, "POST done")
 
+		urlToFile := []byte(stripURL)
+
+		fileToWrite := fmt.Sprintf("%s/urlfile.txt", userHome)
+
+		err = ioutil.WriteFile(fileToWrite, urlToFile, 0644)
+		if err != nil {
+			log.Println(err)
+		}
+
 	} else {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 	}
 
 }
+
+// User Home directory
+var userHome = os.Getenv("HOME")
 
 // ConfigFile holds the user supplied configuration file - it is placed here since it is a global
 var ConfigFile *string
