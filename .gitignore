@@ -10,6 +10,7 @@ remotechrome_linux
 remotechrome_mac
 remotechrome_darwin
 remotechrome_win
+remotechrome_arm
 test.toml
 
 # Test binary, build with `go test -c`
