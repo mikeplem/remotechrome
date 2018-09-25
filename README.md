@@ -4,6 +4,8 @@
 
 This program depends upon, https://github.com/raff/godet.  This library does the hard work of talking to the remote debug port of Chrome.
 
+A lot of help came from this page.  https://die-antwort.eu/techblog/2017-12-setup-raspberry-pi-for-kiosk-mode/
+
 ## Requirements
 
 You must be using Chromium (maybe Chrome) and you must start it with remote debugging turned on.  The included shell script will start the browser with remote debugging and sets a temporary user profile.
