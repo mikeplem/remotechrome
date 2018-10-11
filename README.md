@@ -4,13 +4,15 @@
 
 This program depends upon, https://github.com/raff/godet.  This library does the hard work of talking to the remote debug port of Chrome.
 
-A lot of help came from this page.  https://die-antwort.eu/techblog/2017-12-setup-raspberry-pi-for-kiosk-mode/
-
 ## Requirements
 
 You must be using Chromium (maybe Chrome) and you must start it with remote debugging turned on.  The included shell script will start the browser with remote debugging and sets a temporary user profile.
 
 You must fill in the necessary items in the config.toml file.
+
+### Building
+
+Use the appropriate build_ARCH.sh script
 
 ### Server
 
@@ -52,4 +54,44 @@ curl http://localhost:9222/current
 curl -X POST -d "https://www.google.com" http://localhost:9222/open
 ```
 
+## Config TOML Format
 
+### Listen Section
+
+This section is used to configure the port you want the web interface for this tool to listen.  It is also where you configure SSL support.
+
+```shell
+[listen]
+ssl = false
+cert = "wildcard_certificate"
+key = "wildcard_key"
+port = 8081
+```
+
+### Chrome Section
+
+* `host` should be localhost but it is the network address the Chromium remote debugging is configured for.
+
+* `port` is the default Chromium remote debugging port
+
+```shell
+[chrome]
+host = "localhost"
+port = 9222
+```
+
+## Example Starting Chromium
+
+The following is a shell script that shows how Chromium could be started.  Notice `PREVURL`.  The program will write out the URL that was sent to the client so that it can be loaded by default.  The location of the file is $HOME/urlfile.txt.  This is on line 82 of main.go.
+
+```shell
+#!/bin/sh
+CHROME_DATA_DIR=$(mktemp -d)
+trap "rm -rf ${CHROME_DATA_DIR}" SIGINT SIGTERM EXIT
+
+PREVURL=$(cat /home/pi/urlfile.txt)
+DEFAULTURL="https://google.com"
+URL=${PREVURL:-$DEFAULTURL}
+
+/usr/bin/chromium-browser --remote-debugging-port=9222 --user-data-dir="${CHROME_DATA_DIR}" --disable-infobars --kiosk "${URL}"
+```

@@ -27,6 +27,8 @@ func printCurrentURL(w http.ResponseWriter, r *http.Request) {
 
 	defer remote.Close()
 
+	// when the browser starts there is a hidden tab called background_page.
+	// do not show that in the list of open tabs
 	tabs, _ := remote.TabList("")
 	for _, value := range tabs {
 		if value.Type != "background_page" {
