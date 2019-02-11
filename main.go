@@ -8,12 +8,50 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/raff/godet"
 )
+
+// User Home directory
+var userHome = os.Getenv("HOME")
+
+// ConfigFile holds the user supplied configuration file - it is placed here since it is a global
+var ConfigFile *string
+
+// Config is the structure of the TOML config structure
+var Config tomlConfig
+
+type tomlConfig struct {
+	Listen listenconfig `toml:"listen"`
+	Chrome chromeconfig `toml:"chrome"`
+}
+
+type listenconfig struct {
+	SSL  bool
+	Cert string
+	Key  string
+	Port int
+}
+
+type chromeconfig struct {
+	Host string
+	Port int
+}
+
+func reloadBrowser(w http.ResponseWriter, r *http.Request) {
+	cmd := exec.Command("xdotool", "key", "ctrl+shift+r")
+	cmd.Env = append(os.Environ(), "DISPLAY=:0")
+	log.Printf("Running command and waiting for it to finish...")
+
+	if err := cmd.Run(); err != nil {
+		errorHandler(w, r, http.StatusGone)
+		return
+	}
+}
 
 func printCurrentURL(w http.ResponseWriter, r *http.Request) {
 
@@ -58,7 +96,8 @@ func openURLInBrowser(w http.ResponseWriter, r *http.Request) {
 
 		u, err := url.Parse(openURL)
 		if err != nil {
-			log.Fatal(err)
+			errorHandler(w, r, http.StatusBadRequest)
+			return
 		}
 		unescapeURL, err := url.PathUnescape(u.String())
 		if err != nil {
@@ -94,30 +133,18 @@ func openURLInBrowser(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// User Home directory
-var userHome = os.Getenv("HOME")
+func errorHandler(w http.ResponseWriter, r *http.Request, status int) {
+	w.WriteHeader(status)
 
-// ConfigFile holds the user supplied configuration file - it is placed here since it is a global
-var ConfigFile *string
+	switch status {
+	case http.StatusGone:
+		log.Print("The command does not exist.")
+		return
+	case http.StatusBadRequest:
+		log.Print("The URL did not open for some reason.")
+		return
+	}
 
-// Config is the structure of the TOML config structure
-var Config tomlConfig
-
-type tomlConfig struct {
-	Listen listenconfig `toml:"listen"`
-	Chrome chromeconfig `toml:"chrome"`
-}
-
-type listenconfig struct {
-	SSL  bool
-	Cert string
-	Key  string
-	Port int
-}
-
-type chromeconfig struct {
-	Host string
-	Port int
 }
 
 func init() {
@@ -139,6 +166,7 @@ func main() {
 	http.HandleFunc("/", printCurrentURL)
 	http.HandleFunc("/current", printCurrentURL)
 	http.HandleFunc("/open", openURLInBrowser)
+	http.HandleFunc("/reload", reloadBrowser)
 
 	if Config.Listen.SSL == true {
 		fmt.Println("Listening on port " + listenPort + " with SSL")
