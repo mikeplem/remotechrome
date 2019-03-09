@@ -54,6 +54,26 @@ curl http://localhost:9222/current
 curl -X POST -d "https://www.google.com" http://localhost:9222/open
 ```
 
+### Available Endpoints
+
+#### View the current URL
+
+- /
+- /current
+	
+#### Open a URL
+
+- /open
+
+#### Reload the current URL
+
+- /reload
+
+#### Take and View Screenshot	
+
+- /screenshot
+- /view
+
 ## Config TOML Format
 
 ### Listen Section
@@ -89,7 +109,7 @@ The following is a shell script that shows how Chromium could be started.  Notic
 CHROME_DATA_DIR=$(mktemp -d)
 trap "rm -rf ${CHROME_DATA_DIR}" SIGINT SIGTERM EXIT
 
-PREVURL=$(cat /home/pi/urlfile.txt)
+PREVURL=$(cat ${HOME}/urlfile.txt)
 DEFAULTURL="https://google.com"
 URL=${PREVURL:-$DEFAULTURL}
 

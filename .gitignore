@@ -12,6 +12,7 @@ remotechrome_darwin
 remotechrome_win
 remotechrome_arm
 test.toml
+screenshot.png
 
 # Test binary, build with `go test -c`
 *.test

@@ -8,9 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/raff/godet"
@@ -42,13 +40,46 @@ type chromeconfig struct {
 	Port int
 }
 
-func reloadBrowser(w http.ResponseWriter, r *http.Request) {
-	cmd := exec.Command("xdotool", "key", "ctrl+shift+r")
-	cmd.Env = append(os.Environ(), "DISPLAY=:0")
-	log.Printf("Running command and waiting for it to finish...")
+func viewScreenshot(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "screenshot.png")
+}
 
-	if err := cmd.Run(); err != nil {
-		errorHandler(w, r, http.StatusGone)
+func saveScreenshot(w http.ResponseWriter, r *http.Request) {
+
+	connString := fmt.Sprintf("%s:%d", Config.Chrome.Host, Config.Chrome.Port)
+
+	remote, err := godet.Connect(connString, false)
+	if err != nil {
+		fmt.Fprintln(w, "cannot connect to Chrome instance:", err)
+		return
+	}
+
+	defer remote.Close()
+
+	log.Print("Taking screenshot")
+	err = remote.SaveScreenshot("screenshot.png", 0644, 0, true)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+}
+
+func reloadBrowser(w http.ResponseWriter, r *http.Request) {
+
+	connString := fmt.Sprintf("%s:%d", Config.Chrome.Host, Config.Chrome.Port)
+
+	remote, err := godet.Connect(connString, false)
+	if err != nil {
+		fmt.Fprintln(w, "cannot connect to Chrome instance:", err)
+		return
+	}
+
+	defer remote.Close()
+
+	log.Print("Reloading browser page")
+	err = remote.Reload()
+	if err != nil {
+		log.Print(err)
 		return
 	}
 }
@@ -99,9 +130,10 @@ func openURLInBrowser(w http.ResponseWriter, r *http.Request) {
 			errorHandler(w, r, http.StatusBadRequest)
 			return
 		}
+
 		unescapeURL, err := url.PathUnescape(u.String())
 		if err != nil {
-			log.Println(err)
+			log.Print(err)
 		}
 
 		stripURL := strings.TrimPrefix(unescapeURL, "u=")
@@ -114,7 +146,7 @@ func openURLInBrowser(w http.ResponseWriter, r *http.Request) {
 
 		defer remote.Close()
 
-		fmt.Printf("Requested to open %s\n", stripURL)
+		log.Printf("Requested to open %s\n", stripURL)
 		_, _ = remote.Navigate(stripURL)
 		fmt.Fprint(w, "POST done")
 
@@ -124,7 +156,7 @@ func openURLInBrowser(w http.ResponseWriter, r *http.Request) {
 
 		err = ioutil.WriteFile(fileToWrite, urlToFile, 0644)
 		if err != nil {
-			log.Println(err)
+			log.Print(err)
 		}
 
 	} else {
@@ -167,19 +199,19 @@ func main() {
 	http.HandleFunc("/current", printCurrentURL)
 	http.HandleFunc("/open", openURLInBrowser)
 	http.HandleFunc("/reload", reloadBrowser)
+	http.HandleFunc("/screenshot", saveScreenshot)
+	http.HandleFunc("/view", viewScreenshot)
 
 	if Config.Listen.SSL == true {
-		fmt.Println("Listening on port " + listenPort + " with SSL")
+		log.Print("Listening on port " + listenPort + " with SSL")
 		err := http.ListenAndServeTLS(listenPort, Config.Listen.Cert, Config.Listen.Key, nil)
 		if err != nil {
-			fmt.Print(time.Now())
 			log.Fatal("ListenAndServe: ", err)
 		}
 	} else {
-		fmt.Println("Listening on port " + listenPort + " without SSL")
+		log.Print("Listening on port " + listenPort + " without SSL")
 		err := http.ListenAndServe(listenPort, nil)
 		if err != nil {
-			fmt.Print(time.Now())
 			log.Fatal("ListenAndServe: ", err)
 		}
 	}
