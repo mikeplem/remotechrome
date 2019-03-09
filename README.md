@@ -2,7 +2,10 @@
 
 ## Depends
 
-This program depends upon, https://github.com/raff/godet.  This library does the hard work of talking to the remote debug port of Chrome.
+This program depends upon the following:
+
+- https://github.com/raff/godet  This library does the hard work of talking to the remote debug port of Chrome.
+- https://github.com/BurntSushi/toml - For the config file.
 
 ## Requirements
 
@@ -102,7 +105,7 @@ port = 9222
 
 ## Example Starting Chromium
 
-The following is a shell script that shows how Chromium could be started.  Notice `PREVURL`.  The program will write out the URL that was sent to the client so that it can be loaded by default.  The location of the file is $HOME/urlfile.txt.  This is on line 82 of main.go.
+The following is a shell script that shows how Chromium could be started.  Notice `PREVURL`.  The program will write out the URL that was sent to the client so that it can be loaded by default.  The location of the file is $HOME/urlfile.txt.
 
 ```shell
 #!/bin/sh
